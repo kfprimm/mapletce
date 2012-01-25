@@ -3,10 +3,9 @@ Strict
 
 Framework MaxB3D.GUI
 Import MaxGUI.XPManifest
-Import "engine.bmx"
+Import "src/engine.bmx"
 
 SetGraphicsDriver GLMaxB3DDriver(), GRAPHICS_BACKBUFFER|GRAPHICS_DEPTHBUFFER
-AppTitle = "Maplet CE v1.02"
 
 Const MENU_FILE_NEW			= 1
 Const MENU_FILE_OPEN		= 2
@@ -44,7 +43,7 @@ Type TMaplet
 	Field panel:TGadget,primitivebox:TGadget,texturebox:TGadget,modebox:TGadget
 	Field primitivecanvas:TGadget,gridsizelabel:TGadget,cursorlabel:TGadget
 	
-	Field engine:TMapletEngine = New TMapletEngine
+	Field engines:TMapletEngine[]
 
 	Method New()
 		window=CreateWindow(AppTitle+" - Untitled",32,32,640,480,Null,WINDOW_TITLEBAR|WINDOW_MENU|WINDOW_RESIZABLE|WINDOW_STATUS|WINDOW_HIDDEN)
@@ -114,21 +113,13 @@ Type TMaplet
 		
 		primitivecanvas=CreateCanvas(0,96+48,ClientWidth(panel),ClientWidth(panel),panel)
 		
-		Rem
-		primitive[0]=CreateBSPCube(Null)
-		primitive[1]=CreateBSPRamp(Null)
-		primitive[2]=CreateBSPCylinder(12,Null)
-		Local mat:TMatrix=New TMatrix
-		mat.Rotate(90,0,0)
-		primitive[3]=CreateBSPCylinder(12,mat)
-		primitive[4]=CreateBSPWedge(Null)
-		End Rem
 		gridsizelabel=CreateLabel("Grid size: ",0,144+8+ClientWidth(panel),ClientWidth(panel),15,panel)
 		cursorlabel=CreateLabel("Cursor: ",0,144+8+ClientWidth(panel)+17,ClientWidth(panel),15,panel)
 		
 		SetGraphics CanvasGraphics(canvas)
-'		currentmap=TMapletMap.Add(tabber)		
-	
+		
+		AddMap "<untitled>"
+					
 		AddHook EmitEventHook,Hook,Self
 		ShowGadget window
 				
@@ -138,27 +129,135 @@ Type TMaplet
 	End Method	
 	
 	Method OnEvent(event:TEvent)
+		Local engine:TMapletEngine = TMapletEngine(GadgetItemExtra(tabber, SelectedGadgetItem(tabber)))
+		If TGadget(event.source) = canvas
+			OnCanvasEvent(event)
+			Return
+		EndIf
+		
 		Select event.id
+		Case EVENT_MENUACTION
+			Select event.data
+			Case MENU_FILE_NEW
+				AddMap "<untitled>"
+			Case MENU_FILE_OPEN
+			Case MENU_FILE_SAVE
+			Case MENU_FILE_SAVEAS
+			Case MENU_FILE_CLOSE
+			Case MENU_FILE_EXIT
+				End			
+			Case MENU_EDIT_UNDO
+			Case MENU_EDIT_RESET
+				engine.Reset
+			Case MENU_EDIT_ZOOMIN
+				engine.ChangeZoom 1
+			Case MENU_EDIT_ZOOMOUT
+				engine.ChangeZoom -1
+			Case MENU_EDIT_ROTATEPRIM
+			Case MENU_VIEW_TEXTURED
+			Case MENU_VIEW_OUTLINES
+			Case MENU_VIEW_TRANSPARENT			
+			Case MENU_TEXTURE_OPEN
+			Case MENU_TEXTURE_REPLACE			
+			Case MENU_TOOLS_LIGHTMAPPER
+				Notify "Lightmapper not implemented! (yet)~n~nVisit https://github.com/kfpimm/mapletce~nand consider contributing!"
+			End Select
+			RedrawGadget canvas
+		Case EVENT_GADGETACTION
+			Select event.source
+			Case tabber
+				RefreshUI
+			End Select
 		Case EVENT_WINDOWCLOSE
 			End
 		Case EVENT_WINDOWMOVE
 			RedrawGadget canvas
-		Case EVENT_GADGETPAINT
-			SetGraphics CanvasGraphics(TGadget(event.source))
-			Select event.source
-			Case primitivecanvas
-				Cls
-				Flip
-			Case canvas
+		Case EVENT_WINDOWSIZE
+			For Local engine:TMapletEngine = EachIn engines
 				engine.Resize(ClientWidth(canvas),ClientHeight(canvas))
-				RenderWorld
-				Flip
-			End Select
+			Next
+		Case EVENT_GADGETPAINT
+			SetGraphics CanvasGraphics(primitivecanvas)
+			RenderWorld
+			Flip
 		End Select
+	End Method
+	
+	Method OnCanvasEvent(event:TEvent)
+		Local engine:TMapletEngine = TMapletEngine(GadgetItemExtra(tabber, SelectedGadgetItem(tabber)))
+		Select event.id
+		Case EVENT_KEYDOWN
+			Select event.data
+			Case KEY_LSHIFT
+				If engine.GetMode()=MAPLETMODE_MOVEXZ
+					engine.SetMode MAPLETMODE_MOVEY
+				Else
+					engine.SetMode MAPLETMODE_PLANE
+				EndIf
+			End Select
+		Case EVENT_MOUSEDOWN
+			Select event.data
+			Case 1
+				engine.Mark
+			Case 2
+				If engine.GetMode()=MAPLETMODE_PLANE
+					engine.SetMode MAPLETMODE_MOVEY
+				Else
+					engine.SetMode MAPLETMODE_MOVEXZ
+				EndIf
+			End Select
+		Case EVENT_MOUSEUP, EVENT_KEYUP
+			engine.SetMode 0
+		Case EVENT_MOUSEMOVE
+			engine.MoveCursor(event.x,event.y)
+			RedrawGadget canvas
+			ActivateGadget canvas
+		Case EVENT_GADGETPAINT
+			SetGraphics CanvasGraphics(canvas)
+			engine.world.Render
+			DoMax2D
+			
+			If GetEntityVisible(engine.large_cursor)
+				If engine.begin_marker 
+					SetColor 255,0,0
+				Else
+					SetColor 0,255,0
+				EndIf
+				Local x#,y#
+				CameraProject engine.camera,[engine.marker.x,engine.marker.y,engine.marker.z],x,y
+				DrawRect x-2.5,y-2.5,5,5
+			EndIf
+
+			Flip
+		End Select
+	End Method
+	
+	Method AddMap(name$)
+		engines = engines[..engines.length+1]
+		engines[engines.length-1] = New TMapletEngine
+		AddGadgetItem tabber,name,,,,engines[engines.length-1]
+		SelectGadgetItem tabber,CountGadgetItems(tabber)-1
+
+		RefreshUI
+	End Method
+	
+	Method RefreshUI()
+		RedrawGadget canvas
+		ActivateGadget canvas
 	End Method
 	
 	Function Hook:Object(id,data:Object,context:Object=Null)
 		TMaplet(context).OnEvent(TEvent(data))
 	End Function
 End Type
+
+' just for lawls
+If AppArgs.length > 1
+	If AppArgs[1] = "--retro"
+		AppTitle = "Notify!"
+		Notify "Maplet V1.02 - Release version.~n~nCopyright 2002, Blitz Research Ltd.~n~nPlease visit http://www.blitzbasic.co.nz~nto register your copy of Maplet."
+	EndIf
+EndIf
+		
+AppTitle = "Maplet CE v1.02"
 New TMaplet

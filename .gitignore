@@ -1,0 +1,5 @@
+*.debug
+*.exe
+*.bak
+*.html
+.bmx/
