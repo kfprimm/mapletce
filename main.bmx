@@ -5,29 +5,31 @@ Framework MaxB3D.GUI
 Import MaxGUI.XPManifest
 Import "src/engine.bmx"
 
-SetGraphicsDriver GLMaxB3DDriver(), GRAPHICS_BACKBUFFER|GRAPHICS_DEPTHBUFFER
+'GLShareContexts
+SetGraphicsDriver D3D9MaxB3DDriver(), GRAPHICS_BACKBUFFER|GRAPHICS_DEPTHBUFFER
 
-Const MENU_FILE_NEW			= 1
-Const MENU_FILE_OPEN		= 2
-Const MENU_FILE_SAVE		= 3
-Const MENU_FILE_SAVEAS		= 4
-Const MENU_FILE_CLOSE		= 5
-Const MENU_FILE_EXIT		= 6
+Const MENU_FILE_NEW						= 1
+Const MENU_FILE_OPEN					= 2
+Const MENU_FILE_SAVE					= 3
+Const MENU_FILE_SAVEAS				= 4
+Const MENU_FILE_CLOSE					= 5
+Const MENU_FILE_EXIT					= 6
 
-Const MENU_EDIT_UNDO		= 7
-Const MENU_EDIT_RESET		= 8
-Const MENU_EDIT_ZOOMIN		= 9
-Const MENU_EDIT_ZOOMOUT		= 10
-Const MENU_EDIT_ROTATEPRIM	= 11
+Const MENU_EDIT_UNDO					= 7
+Const MENU_EDIT_RESET					= 8
+Const MENU_EDIT_ZOOMIN				= 9
+Const MENU_EDIT_ZOOMOUT				= 10
+Const MENU_EDIT_ROTATEPRIM		= 11
 
-Const MENU_VIEW_TEXTURED		= 12
-Const MENU_VIEW_OUTLINES		= 13
-Const MENU_VIEW_TRANSPARENT	= 14
+Const MENU_VIEW_TEXTURED			= 12
+Const MENU_VIEW_OUTLINES			= 13
+Const MENU_VIEW_TRANSPARENT		= 14
+Const MENU_VIEW_WIREFRAME			= 15
 
-Const MENU_TEXTURE_OPEN		= 15
-Const MENU_TEXTURE_REPLACE	= 16
+Const MENU_TEXTURE_OPEN				= 16
+Const MENU_TEXTURE_REPLACE		= 17
 
-Const MENU_TOOLS_LIGHTMAPPER	= 17
+Const MENU_TOOLS_LIGHTMAPPER	= 18
 
 Const CURSOR_NONE		= 0
 Const CURSOR_SELECT		= 1
@@ -44,6 +46,7 @@ Type TMaplet
 	Field primitivecanvas:TGadget,gridsizelabel:TGadget,cursorlabel:TGadget
 	
 	Field engines:TMapletEngine[]
+	Field renderinfo:TRenderInfo
 
 	Method New()
 		window=CreateWindow(AppTitle+" - Untitled",32,32,640,480,Null,WINDOW_TITLEBAR|WINDOW_MENU|WINDOW_RESIZABLE|WINDOW_STATUS|WINDOW_HIDDEN)
@@ -74,6 +77,7 @@ Type TMaplet
 			CheckMenu CreateMenu("Textured",MENU_VIEW_TEXTURED,viewmenu,KEY_F9)
 			CheckMenu CreateMenu("Outline backfacing",MENU_VIEW_OUTLINES,viewmenu,KEY_F10)
 			CreateMenu "Transparent",MENU_VIEW_TRANSPARENT,viewmenu,KEY_F11
+			CreateMenu "Wireframe",MENU_VIEW_WIREFRAME,viewmenu,KEY_F12
 		Local texturemenu:TGadget=CreateMenu("Texture",0,WindowMenu(window))
 			CreateMenu "Open...",MENU_TEXTURE_OPEN,texturemenu
 			CreateMenu "Replace...",MENU_TEXTURE_REPLACE,texturemenu
@@ -83,10 +87,7 @@ Type TMaplet
 		
 		tabber=CreateTabber(4,4,ClientWidth(window)-8,ClientHeight(window)-8,window)
 		SetGadgetLayout tabber,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
-		
-		canvas=CreateCanvas(0,0,486,ClientHeight(tabber)-2,tabber)
-		SetGadgetLayout canvas,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
-			
+					
 		panel=CreatePanel(488,0,ClientWidth(tabber)-492,ClientHeight(tabber),tabber)
 		SetGadgetLayout panel,EDGE_CENTERED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_CENTERED
 		CreateLabel "Primitive:",0,0,ClientWidth(panel),13,panel
@@ -110,19 +111,22 @@ Type TMaplet
 		AddGadgetItem modebox,"Fill"
 		AddGadgetItem modebox,"Copy"
 		SelectGadgetItem modebox,0
-		
-		primitivecanvas=CreateCanvas(0,96+48,ClientWidth(panel),ClientWidth(panel),panel)
-		
+			
 		gridsizelabel=CreateLabel("Grid size: ",0,144+8+ClientWidth(panel),ClientWidth(panel),15,panel)
 		cursorlabel=CreateLabel("Cursor: ",0,144+8+ClientWidth(panel)+17,ClientWidth(panel),15,panel)
 		
+		canvas=CreateCanvas(0,0,486,ClientHeight(tabber)-2,tabber)
+		SetGadgetLayout canvas,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
+
+		AddHook EmitEventHook,Hook,Self						
+		ShowGadget window
+
+		primitivecanvas=CreateCanvas(0,96+48,ClientWidth(panel),ClientWidth(panel),panel)
+
 		SetGraphics CanvasGraphics(canvas)
 		
 		AddMap "<untitled>"
 					
-		AddHook EmitEventHook,Hook,Self
-		ShowGadget window
-				
 		Repeat
 			WaitSystem
 		Forever
@@ -134,7 +138,8 @@ Type TMaplet
 			OnCanvasEvent(event)
 			Return
 		EndIf
-		
+		Local gadget:TGadget = TGadget(event.source)
+
 		Select event.id
 		Case EVENT_MENUACTION
 			Select event.data
@@ -156,7 +161,15 @@ Type TMaplet
 			Case MENU_EDIT_ROTATEPRIM
 			Case MENU_VIEW_TEXTURED
 			Case MENU_VIEW_OUTLINES
-			Case MENU_VIEW_TRANSPARENT			
+			Case MENU_VIEW_TRANSPARENT	
+			Case MENU_VIEW_WIREFRAME
+				If MenuChecked(gadget)
+					UncheckMenu gadget
+					SetEntityFX engine.model, FX_WIREFRAME
+				Else
+					CheckMenu gadget
+					SetEntityFX engine.model, 0
+				EndIf
 			Case MENU_TEXTURE_OPEN
 			Case MENU_TEXTURE_REPLACE			
 			Case MENU_TOOLS_LIGHTMAPPER
@@ -178,7 +191,7 @@ Type TMaplet
 			Next
 		Case EVENT_GADGETPAINT
 			SetGraphics CanvasGraphics(primitivecanvas)
-			RenderWorld
+			Cls
 			Flip
 		End Select
 	End Method
@@ -195,6 +208,7 @@ Type TMaplet
 					engine.SetMode MAPLETMODE_PLANE
 				EndIf
 			End Select
+			RedrawGadget canvas
 		Case EVENT_MOUSEDOWN
 			Select event.data
 			Case 1
@@ -206,16 +220,53 @@ Type TMaplet
 					engine.SetMode MAPLETMODE_MOVEXZ
 				EndIf
 			End Select
+			RedrawGadget canvas
 		Case EVENT_MOUSEUP, EVENT_KEYUP
-			engine.SetMode 0
+			Select event.data
+			Case 1
+				If engine.mode = 0 
+					If engine.begin_marker
+						If Not engine.marker.IsEqual(engine.begin_marker)
+							engine.SetMode MAPLETMODE_PLANE
+						Else
+							engine.SetMode 0
+							engine.Mark
+						EndIf
+					Else
+						engine.SetMode 0
+						engine.Mark
+					EndIf
+				Else
+					engine.SetMode 0
+				End If
+			Case 2,KEY_LSHIFT
+				engine.SetMode 0
+			Case KEY_P
+				Function PrintTree(tree:TBSPTree)
+					Local node:TBSPNode=tree.Node
+					If node=Null Return
+					PrintTree(node.In)		
+	
+					For Local poly:TBSPPolygon=EachIn node.On
+						Print "Normal: "+poly.Plane.x+","+poly.Plane.y+","+poly.Plane.z
+						For Local i=0 To poly.Count()-1
+							Print "  "+poly.Point[i].x+","+poly.Point[i].y+","+poly.Point[i].z
+						Next
+					Next		
+					PrintTree(node.Out)
+				End Function
+				PrintTree engine.model.GetTree()
+			End Select
 		Case EVENT_MOUSEMOVE
 			engine.MoveCursor(event.x,event.y)
 			RedrawGadget canvas
 			ActivateGadget canvas
 		Case EVENT_GADGETPAINT
 			SetGraphics CanvasGraphics(canvas)
-			engine.world.Render
+			renderinfo = engine.world.Render()
 			DoMax2D
+			
+			SetStatusText window,"Triangles: "+renderinfo.Triangles+" Nodes: "+engine.model.GetTree().CountNodes()
 			
 			If GetEntityVisible(engine.large_cursor)
 				If engine.begin_marker 

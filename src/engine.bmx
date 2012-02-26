@@ -7,6 +7,8 @@ Import MaxB3DEx.Grid
 Import MaxB3DEx.GLGrid
 Import MaxB3DEx.D3D9Grid
 
+Import BRL.BMPLoader
+
 Const MAPLETMODE_MOVEXZ	= 1
 Const MAPLETMODE_MOVEY	= 2
 Const MAPLETMODE_ROTATE	= 3
@@ -98,21 +100,12 @@ Type TMapletEngine
 		cube_tree.Insert cube_list,BSP_OUT,BSP_OUT
 		cube_model = LoadBSPModel(cube_tree)
 		
+		SetEntityTexture cube_model, LoadTexture("castlest.bmp")
+		
 		selection_model = cube_model
 		SetEntityVisible cube_model,False
 		
-'		model = CreateBSPModel()
-
-		Rem
-		Local cube0:TList=BSPCube(TMatrix.Scale(-1,-1,-1))
-		Local cube1:TList=BSPCube(TMatrix.Transformation(0.625,0,0,,,,-1,-1,-1))
-		Local cube2:TList=BSPCube(TMatrix.Transformation(.5,0,0,0,0,0,.2,.2,.2))
-		
-		model.Insert cube0,BSP_OUT,BSP_OUT
-		model.Reduce
-		model.Insert cube2,BSP_OUT,BSP_OUT
-		model.Reduce
-		End Rem
+		model = CreateBSPModel()
 
 		Reset
 	End Method
@@ -134,6 +127,8 @@ Type TMapletEngine
 		SetEntityPosition reference,-128,0,-128
 		SetEntityPosition large_cursor,-24,0,-24
 		
+		mode = 0
+		begin_marker = Null
 		marker = Vec3(0,0,0)
 				
 		ChangeZoom 0
@@ -200,6 +195,30 @@ Type TMapletEngine
 	
 	Method Mark()
 		If begin_marker
+			If mode = MAPLETMODE_PLANE And marker.y<>begin_marker.y
+				Local x#,y#,z#
+				Local width#,height#,depth#
+				
+				width = marker.x-begin_marker.x
+				height = marker.y-begin_marker.y
+				depth = marker.z-begin_marker.z
+				
+				x = begin_marker.x+width/2.0
+				y = begin_marker.y+height/2.0
+				z = begin_marker.z+depth/2.0
+
+				Local cube:TList = BSPCube(TMatrix.Transformation(x,y,z,0,0,0,-Abs(width/2.0),-Abs(height/2.0),-Abs(depth/2.0)))
+				model.Insert cube,BSP_IN,BSP_IN		
+				model.Reduce	
+				model._tree.Optimize()
+				
+				marker.y = begin_marker.y
+				
+				GetEntityPosition reference,x,y,z
+				SetEntityPosition reference,x,marker.y,z
+				GetEntityPosition large_cursor,x,y,z
+				SetEntityPosition large_cursor,x,marker.y,z				
+			EndIf
 			SetEntityVisible selection_model, False
 			begin_marker = Null
 		Else
@@ -211,9 +230,14 @@ Type TMapletEngine
 	
 	Method UpdatePreview()
 		If begin_marker
-			SetEntityPosition selection_model,begin_marker.x,begin_marker.y,begin_marker.z
+			Local width#,height#,depth#
+			width = marker.x-begin_marker.x
+			height = marker.y-begin_marker.y
+			depth = marker.z-begin_marker.z
+			SetEntityScale selection_model,Abs(width/2.0),Abs(height/2.0),Abs(depth/2.0)
+			SetEntityPosition selection_model,begin_marker.x+width/2.0,begin_marker.y+height/2.0,begin_marker.z+depth/2.0
 		EndIf
-	End Method
+	End Method	
 			
 	Method MouseIntersect(x# Var, y# Var, z# Var, plane:TPlane)
 		Local ptA:TVector = Vec3(0,0,0), ptB:TVector = Vec3(0,0,0)
