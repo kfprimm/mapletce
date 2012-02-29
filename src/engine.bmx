@@ -3,9 +3,14 @@ Strict
 
 Import MaxB3D.Functions
 Import MaxB3D.Primitives
+
+Import MaxB3D.BSPLoader
+
 Import MaxB3DEx.Grid
 Import MaxB3DEx.GLGrid
 Import MaxB3DEx.D3D9Grid
+
+Import MaxB3DEx.Lightmapper
 
 Import BRL.BMPLoader
 
@@ -52,7 +57,8 @@ Public
 Type TMapletEngine
 	Field world:TWorld, light:TLight, camera:TCamera
 	Field grids:TPivot, reference:TGrid, large_cursor:TGrid, small_cursor:TGrid
-	Field model:TBSPModel
+	Field model:TBSPModel, render:TMesh, lightmapper:TLightmapper
+	Field lightmesh:TMesh
 	Field zoom
 	
 	Field mode, view
@@ -104,6 +110,13 @@ Type TMapletEngine
 		
 		selection_model = cube_model
 		SetEntityVisible cube_model,False
+		
+		lightmapper = New TLightmapper
+		lightmapper.SetAmbient 20,20,20
+		
+		lightmesh = CreateCube()
+		ScaleMesh lightmesh,.25,.25,.25
+		SetEntityVisible lightmesh, False
 		
 		model = CreateBSPModel()
 
@@ -217,7 +230,13 @@ Type TMapletEngine
 				GetEntityPosition reference,x,y,z
 				SetEntityPosition reference,x,marker.y,z
 				GetEntityPosition large_cursor,x,y,z
-				SetEntityPosition large_cursor,x,marker.y,z				
+				SetEntityPosition large_cursor,x,marker.y,z		
+				
+				If render
+					FreeEntity render
+					render = Null
+				EndIf
+				SetEntityVisible model, True						
 			EndIf
 			SetEntityVisible selection_model, False
 			begin_marker = Null
@@ -238,6 +257,22 @@ Type TMapletEngine
 			SetEntityPosition selection_model,begin_marker.x+width/2.0,begin_marker.y+height/2.0,begin_marker.z+depth/2.0
 		EndIf
 	End Method	
+	
+	Method AddLight()
+		If marker
+			lightmapper.AddLight marker.x, marker.y, marker.z, 255, 255, 255, 10, True, 3
+			Local mesh:TMesh = lightmesh.Copy()
+			SetEntityPosition mesh,marker.x, marker.y, marker.z
+		EndIf
+	End Method
+	
+	Method Lightmap()
+		render = LoadMesh(model)
+		SetEntityVisible model, False
+		Local pixmap:TPixmap = lightmapper.Run(render,  0.2, 2)
+		SavePixmapJPeg pixmap, "render.jpg"
+		SetEntityTexture render,LoadTexture(pixmap)
+	End Method
 			
 	Method MouseIntersect(x# Var, y# Var, z# Var, plane:TPlane)
 		Local ptA:TVector = Vec3(0,0,0), ptB:TVector = Vec3(0,0,0)

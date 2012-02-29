@@ -5,8 +5,8 @@ Framework MaxB3D.GUI
 Import MaxGUI.XPManifest
 Import "src/engine.bmx"
 
-'GLShareContexts
-SetGraphicsDriver D3D9MaxB3DDriver(), GRAPHICS_BACKBUFFER|GRAPHICS_DEPTHBUFFER
+GLShareContexts
+SetGraphicsDriver GLMaxB3DDriver(), GRAPHICS_BACKBUFFER|GRAPHICS_DEPTHBUFFER
 
 Const MENU_FILE_NEW						= 1
 Const MENU_FILE_OPEN					= 2
@@ -256,6 +256,10 @@ Type TMaplet
 					PrintTree(node.Out)
 				End Function
 				PrintTree engine.model.GetTree()
+			Case KEY_L
+				engine.AddLight()
+			Case KEY_SPACE
+				engine.Lightmap()
 			End Select
 		Case EVENT_MOUSEMOVE
 			engine.MoveCursor(event.x,event.y)
