@@ -91,7 +91,7 @@ Type TMaplet
 		panel=CreatePanel(488,0,ClientWidth(tabber)-492,ClientHeight(tabber),tabber)
 		SetGadgetLayout panel,EDGE_CENTERED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_CENTERED
 		CreateLabel "Primitive:",0,0,ClientWidth(panel),13,panel
-		primitivebox=CreateComboBox(0,15,ClientWidth(panel),15,panel)
+		primitivebox=CreateComboBox(0,15,ClientWidth(panel),20,panel)
 		AddGadgetItem primitivebox,"Box"
 		AddGadgetItem primitivebox,"Ramp"
 		AddGadgetItem primitivebox,"Column"
@@ -115,11 +115,11 @@ Type TMaplet
 		gridsizelabel=CreateLabel("Grid size: ",0,144+8+ClientWidth(panel),ClientWidth(panel),15,panel)
 		cursorlabel=CreateLabel("Cursor: ",0,144+8+ClientWidth(panel)+17,ClientWidth(panel),15,panel)
 		
-		canvas=CreateCanvas(0,0,486,ClientHeight(tabber)-2,tabber)
-		SetGadgetLayout canvas,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
-
 		AddHook EmitEventHook,Hook,Self						
 		ShowGadget window
+
+		canvas=CreateCanvas(0,0,486,ClientHeight(tabber)-2,tabber)
+		SetGadgetLayout canvas,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED,EDGE_ALIGNED
 
 		primitivecanvas=CreateCanvas(0,96+48,ClientWidth(panel),ClientWidth(panel),panel)
 
