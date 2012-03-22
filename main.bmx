@@ -134,10 +134,6 @@ Type TMaplet
 	
 	Method OnEvent(event:TEvent)
 		Local engine:TMapletEngine = TMapletEngine(GadgetItemExtra(tabber, SelectedGadgetItem(tabber)))
-		If TGadget(event.source) = canvas
-			OnCanvasEvent(event)
-			Return
-		EndIf
 		Local gadget:TGadget = TGadget(event.source)
 
 		Select event.id
@@ -189,8 +185,11 @@ Type TMaplet
 			For Local engine:TMapletEngine = EachIn engines
 				engine.Resize(ClientWidth(canvas),ClientHeight(canvas))
 			Next
+		Case EVENT_KEYDOWN, EVENT_MOUSEDOWN, EVENT_MOUSEMOVE
+			RedrawGadget primitivecanvas
 		Case EVENT_GADGETPAINT
 			SetGraphics CanvasGraphics(primitivecanvas)
+			SetClsColor 0,0,255
 			Cls
 			Flip
 		End Select
@@ -198,71 +197,9 @@ Type TMaplet
 	
 	Method OnCanvasEvent(event:TEvent)
 		Local engine:TMapletEngine = TMapletEngine(GadgetItemExtra(tabber, SelectedGadgetItem(tabber)))
+		engine.OnEvent(event)
 		Select event.id
-		Case EVENT_KEYDOWN
-			Select event.data
-			Case KEY_LSHIFT
-				If engine.GetMode()=MAPLETMODE_MOVEXZ
-					engine.SetMode MAPLETMODE_MOVEY
-				Else
-					engine.SetMode MAPLETMODE_PLANE
-				EndIf
-			End Select
-			RedrawGadget canvas
-		Case EVENT_MOUSEDOWN
-			Select event.data
-			Case 1
-				engine.Mark
-			Case 2
-				If engine.GetMode()=MAPLETMODE_PLANE
-					engine.SetMode MAPLETMODE_MOVEY
-				Else
-					engine.SetMode MAPLETMODE_MOVEXZ
-				EndIf
-			End Select
-			RedrawGadget canvas
-		Case EVENT_MOUSEUP, EVENT_KEYUP
-			Select event.data
-			Case 1
-				If engine.mode = 0 
-					If engine.begin_marker
-						If Not engine.marker.IsEqual(engine.begin_marker)
-							engine.SetMode MAPLETMODE_PLANE
-						Else
-							engine.SetMode 0
-							engine.Mark
-						EndIf
-					Else
-						engine.SetMode 0
-						engine.Mark
-					EndIf
-				Else
-					engine.SetMode 0
-				End If
-			Case 2,KEY_LSHIFT
-				engine.SetMode 0
-			Case KEY_P
-				Function PrintTree(tree:TBSPTree)
-					Local node:TBSPNode=tree.Node
-					If node=Null Return
-					PrintTree(node.In)		
-	
-					For Local poly:TBSPPolygon=EachIn node.On
-						Print "Normal: "+poly.Plane.x+","+poly.Plane.y+","+poly.Plane.z
-						For Local i=0 To poly.Count()-1
-							Print "  "+poly.Point[i].x+","+poly.Point[i].y+","+poly.Point[i].z
-						Next
-					Next		
-					PrintTree(node.Out)
-				End Function
-				PrintTree engine.model.GetTree()
-			Case KEY_L
-				engine.AddLight()
-			Case KEY_SPACE
-				engine.Lightmap()
-			End Select
-		Case EVENT_MOUSEMOVE
-			engine.MoveCursor(event.x,event.y)
+		Case EVENT_KEYDOWN, EVENT_MOUSEDOWN, EVENT_MOUSEMOVE
 			RedrawGadget canvas
 			ActivateGadget canvas
 		Case EVENT_GADGETPAINT
@@ -302,7 +239,13 @@ Type TMaplet
 	End Method
 	
 	Function Hook:Object(id,data:Object,context:Object=Null)
-		TMaplet(context).OnEvent(TEvent(data))
+		Local event:TEvent = TEvent(data)
+		If event.source = TMaplet(context).canvas
+			TMaplet(context).OnCanvasEvent(event)
+		Else
+			TMaplet(context).OnEvent(event)
+		EndIf
+	Print TEvent(data).ToString()		
 	End Function
 End Type
 

@@ -5,46 +5,17 @@ Framework MaxB3D.Drivers
 Import MaxB3DEx.Helper
 Import "src/engine.bmx"
 
-SetGraphicsDriver D3D9MaxB3DDriver(), GRAPHICS_BACKBUFFER|GRAPHICS_DEPTHBUFFER
+''SetGraphicsDriver D3D9MaxB3DDriver(), GRAPHICS_BACKBUFFER|GRAPHICS_DEPTHBUFFER
 Graphics 800,600
 
 Local engine:TMapletEngine = New TMapletEngine
 
-Local plane:TPlane = New TPlane.FromPoint(Vec3(0,1,0),Vec3(0,2,0))
+Function Hook:Object(id,data:Object,context:Object=Null)
+	TMapletEngine(context).OnEvent(TEvent(data))
+End Function
+AddHook EmitEventHook, Hook, engine
 
-Local fly = False
 While Not KeyDown(KEY_ESCAPE) And Not AppTerminate()	
-	If KeyHit(KEY_F) fly=Not fly
-	If fly FlyCam engine.camera
-
-	engine.ChangeZoom KeyHit(KEY_A)-KeyHit(KEY_Z)
-	engine.ChangeZoom KeyHit(KEY_S)-KeyHit(KEY_X)
-	
-	If KeyHit(KEY_R) engine.Reset
-	
-	Select True
-	Case KeyDown(KEY_LCONTROL)
-		engine.SetMode MAPLETMODE_ROTATE
-	Case KeyDown(KEY_LSHIFT) And MouseDown(2)
-		engine.SetMode MAPLETMODE_MOVEY
-	Case MouseDown(1)
-		engine.Mark()
-	Case MouseDown(2)
-		engine.SetMode MAPLETMODE_MOVEXZ
-	Case KeyDown(KEY_LSHIFT)
-		engine.SetMode MAPLETMODE_PLANE
-	Case KeyDown(KEY_F1)
-		engine.SetView MAPLETVIEW_FACES
-	Case KeyDown(KEY_F2)
-		engine.SetView MAPLETVIEW_WIREFRAME
-	Default
-		engine.SetMode 0
-	End Select
-	
-	engine.MoveCursor(MouseX(), MouseY())
-	
-'	TurnEntity engine.model,1,1,0
-	
 	Local info:TRenderInfo = RenderWorld()
 	DoMax2D
 	

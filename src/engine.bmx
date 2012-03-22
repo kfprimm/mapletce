@@ -13,6 +13,7 @@ Import MaxB3DEx.D3D9Grid
 Import MaxB3DEx.Lightmapper
 
 Import BRL.BMPLoader
+Import BRL.JPGLoader
 
 Const MAPLETMODE_MOVEXZ	= 1
 Const MAPLETMODE_MOVEY	= 2
@@ -123,15 +124,71 @@ Type TMapletEngine
 		Reset
 	End Method
 	
+	Method OnEvent(event:TEvent)
+		Select event.id
+		Case EVENT_KEYDOWN
+			Select event.data
+			Case KEY_LSHIFT
+				If mode = MAPLETMODE_MOVEXZ
+					mode = MAPLETMODE_MOVEY
+				Else
+					mode = MAPLETMODE_PLANE
+				EndIf
+			End Select
+		Case EVENT_MOUSEWHEEL
+			MoveEntity camera,0,0,event.data
+		Case EVENT_MOUSEMOVE
+			MoveCursor event.x, event.y
+		Case EVENT_MOUSEDOWN
+			Select event.data
+			Case 1
+				If mode <> MAPLETMODE_PLANE Mark
+			Case 2
+				If mode = MAPLETMODE_PLANE
+					mode = MAPLETMODE_MOVEY
+				Else
+					mode = MAPLETMODE_MOVEXZ
+				EndIf
+			End Select
+		Case EVENT_MOUSEUP, EVENT_KEYUP
+			Select event.data
+			Case 1
+				If mode = 0 
+					If begin_marker
+						If Abs(begin_marker.x - marker.x) * Abs(begin_marker.z - marker.z) > 0
+							mode = MAPLETMODE_PLANE
+						Else
+							Mark
+						EndIf
+					Else
+						Mark
+					EndIf
+				Else
+					Mark
+				End If
+			Case 2,KEY_LSHIFT
+				mode = 0
+			Case KEY_A, KEY_Z
+				Local inc = 1
+				If event.data = KEY_Z inc = -1
+				ChangeZoom inc
+			Case KEY_L
+				AddLight()
+			Case KEY_SPACE
+				Lightmap()
+			End Select
+		End Select
+	End Method
+	
+	Method Resize(width, height)
+		SetCameraViewport camera,0,0,width,height
+	End Method
+	
 	Method ChangeZoom(inc)
 		zoom = Min(3,Max(0, zoom + inc))
 		Local size# = 48*(2^zoom), scale# = 1*(.5^zoom)
 		SetGridSize small_cursor,size,size
 		SetEntityScale small_cursor,scale,scale,scale
-	End Method
-	
-	Method Resize(width, height)
-		SetCameraViewport camera,0,0,width,height
 	End Method
 	
 	Method Reset()
@@ -147,13 +204,6 @@ Type TMapletEngine
 		ChangeZoom 0
 	End Method
 
-	Method GetMode()
-		Return mode
-	End Method
-	Method SetMode(m)
-		mode = m
-	End Method
-	
 	Method SetView(v)
 		view = v
 		SetEntityFX model, 0
@@ -223,17 +273,16 @@ Type TMapletEngine
 				Local cube:TList = BSPCube(TMatrix.Transformation(x,y,z,0,0,0,-Abs(width/2.0),-Abs(height/2.0),-Abs(depth/2.0)))
 				model.Insert cube,BSP_IN,BSP_IN		
 				model.Reduce	
-				model._tree.Optimize()
 				
 				marker.y = begin_marker.y
-				
+								
 				GetEntityPosition reference,x,y,z
 				SetEntityPosition reference,x,marker.y,z
 				GetEntityPosition large_cursor,x,y,z
 				SetEntityPosition large_cursor,x,marker.y,z		
 				
 				If render
-					FreeEntity render
+					SetEntityVisible render, False
 					render = Null
 				EndIf
 				SetEntityVisible model, True						
@@ -245,6 +294,8 @@ Type TMapletEngine
 			UpdatePreview
 			SetEntityVisible selection_model, True
 		EndIf
+		
+		mode = 0
 	End Method
 	
 	Method UpdatePreview()
